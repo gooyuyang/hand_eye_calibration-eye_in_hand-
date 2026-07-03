@@ -26,7 +26,7 @@
 
 
 
-## 原理
+## 原理（我主要是使用眼在手上这一类型的标定手段，因此原理只讲解eye-in-hand）
 
 ### 1.眼在手上（eye-in-hand)
 
@@ -87,56 +87,6 @@ $$ X = \begin{bmatrix} R & t \\\ 0 & 1 \end{bmatrix} $$
 
 ​	
 
-### 2 .眼在手外（eye-to-hand)
-
-### ![44776e79-47f7-4de2-9ef2-172b654169d5](picture/44776e79-47f7-4de2-9ef2-172b654169d5-17291482180503.png)
-
-**眼在手外**标定时**固定机械臂基座和相机**，将**标定板固定在机械臂末端**，所以标定过程中**标定板与机械臂末端的关系固定不变，以及相机与机器人基座标的关系固定不变**
-
-标定的目标：相机到机械臂基座坐标系的变换矩阵
-
-$$ {}^{base}_{camera}M $$
-
-实现方法：1.把标定板固定在机械臂末端
-
-​					2.移动机械臂末端，使用相机拍摄不同机械臂姿态下的标定板图片n张 (10~20)
-
-每次采集图片和机械臂位姿，都存在下面等式：
-
-$$ {}^{end}{board}M = {}^{end}{base}M \cdot {}^{base}{camera}M \cdot {}^{camera}{board}M $$
-
-
-其中：
-
-| 符号               | 描述                         |
-| ------------------ | ---------------------------- |
-|$$^{end}_{board}M$$  | 标定板到机械臂末端的变换矩阵（因为标定过程中标定板固定在机械臂末端，标定板到机械臂末端的变化矩阵不变） |
-|$${}^{end}_{base}M$$ | 可以通过机械臂末端位姿算出   |
-|$${}^{base}_{camera}M$$ | 手眼标定需要求的             |
-|$${}^{camera}_{board}M$$ | 通过相机标定方法得到         |
-
-
-
-则可以得到如下等式：
-
-**The Cauchy-Schwarz Inequality**
-
-$$ {}^{end}{base}M_1 \cdot {}^{base}{camera}M_1 \cdot {}^{camera}{board}M_1 = {}^{end}{base}M_2 \cdot {}^{base}{camera}M_2 \cdot {}^{camera}{board}M_2 $$
-
-$$ {}^{end}{base}M_2^{-1} \cdot {}^{end}{base}M_1 \cdot {}^{base}{camera}M_1 = {}^{base}{camera}M_2 \cdot {}^{camera}{board}M_2 \cdot {}^{camera}{board}M_1^{-1} $$
-
-$$ \vdots $$
-
-$$ {}^{end}{base}M_n^{-1} \cdot {}^{end}{base}M_{n-1} \cdot {}^{base}{camera}M{n-1} = {}^{base}{camera}M_n \cdot {}^{camera}{board}M_n \cdot {}^{camera}{board}M{n-1}^{-1} $$
-
-
-
-这也是是一个典型的**AX=XB**问题，而且根据定义，其中X是一个4X4齐次变换矩阵，其中R是相机到机械臂基坐标系的旋转矩阵，t是相机到机械臂基坐标系的平移向量：
-
-$$ X = \begin{bmatrix} R & t \\\ 0 & 1 \end{bmatrix} $$
-
-手眼标定的目的就是为了计算出X。
-
 
 
 ## 关键代码解释
@@ -154,11 +104,11 @@ $$ X = \begin{bmatrix} R & t \\\ 0 & 1 \end{bmatrix} $$
 
 ---robotic_arm_package 机械臂python包
 
----collect_data.py 手眼标定时采集数据程序
+---collect_data.py 手眼标定时采集标定数据程序
 
----compute_in_hand.py 眼在手上标定计算程序
+---newcompute_in_hand.py 眼在手上标定计算程序
 
----compute_to_hand.py 眼在手外标定计算程序
+---config.yaml  标定板参数配置文件（提前设置好）
 
 ---requirements.txt 环境依赖文件
 
@@ -169,11 +119,11 @@ $$ X = \begin{bmatrix} R & t \\\ 0 & 1 \end{bmatrix} $$
 
 
 
-### compute_in_hand.py | compute_to_hand.py关键代码解释
+### newcompute_in_hand.py 关键代码解释
 
 #### 1.主函数`func()`
 
-**compute_in_hand.py | compute_to_hand.py**
+**newcompute_in_hand.py** 
 
 ```python
 def func():
@@ -221,7 +171,7 @@ def func():
 
 #### 2.相机标定
 
-**compute_in_hand.py | compute_to_hand.py**
+**newcompute_in_hand.py**
 
 ```python
 
@@ -241,7 +191,7 @@ ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, size,
 
 #### 3.处理机械臂位姿数据
 
-**compute_in_hand.py**
+**newcompute_in_hand.py**
 
 ```python
 poses_main(file_path)
@@ -249,13 +199,7 @@ poses_main(file_path)
 
 将机械臂末端位姿数据转化为**机械臂末端坐标系**相对于**基坐标系**的旋转矩阵和平移向量
 
-**compute_to_hand.py**
 
-```python
-poses2_main(file_path)
-```
-
-将机械臂末端位姿数据转化为**基坐标系**相对于**机械臂末端坐标系**的旋转矩阵和平移向量
 
 
 
@@ -270,7 +214,7 @@ return R,t
 
 - 使用OpenCV的 `calibrateHandEye` 函数进行手眼标定
 
-  - 在compute_in_hand.py中计算**相机**相对于**机械臂末端**的旋转矩阵 **R_cam2end**和平移向量 **T_cam2end**。
+  - 在newcompute_in_hand.py中计算**相机**相对于**机械臂末端**的旋转矩阵 **R_cam2end**和平移向量 **T_cam2end**。
 
     ```
     void
@@ -286,23 +230,7 @@ return R,t
 
     
 
-  - 在compute_to_hand.py中计算**相机**相对于**机械臂基座**的旋转矩阵 **R_cam2base** 和平移向量**T_cam2base**。
-
-    ```
-    void
-    cv::calibrateHandEye(InputArrayOfArrays 	R_base2end
-                         InputArrayOfArrays 	T_base2end
-                         InputArrayOfArrays 	R_board2cam
-                         InputArrayOfArrays 	T_board2cam
-                         OutputArray 	        R_cam2base
-                         OutputArray 	        T_cam2base
-                         HandEyeCalibrationMethod method = CALIB_HAND_EYE_TSAI)	
-    
-    ```
-
-    
-
-- 采用了 `CALIB_HAND_EYE_TSAI` 方法，这是常用的手眼标定算法
+ 
 
 
 
@@ -485,6 +413,7 @@ config.yaml里的配置参数如下，有下面三个
 ​				
 
 (6).点击键盘“s”采集数据
+ ![标定过程的图片](picture/标定过程的图片.png)
 
 (7)移动15-20次机械臂，重复步骤(5)(6)，采集不同机械臂姿态下的标定板图片15-20张左右
 
@@ -498,9 +427,10 @@ config.yaml里的配置参数如下，有下面三个
 
 ​			![WPS拼图1](picture/WPS拼图1.png)
 
-##### 计算标定结果
+##### 计算标定结果（标定结束后，当标定板的棋盘格出现损伤，有一些图片会无法参与最后的标定计算，因此需要排除之后再计算）
 
-​		运行脚本`compute_in_hand.py`，获取标定结果
+​		运行脚本`newcompute_in_hand.py`，获取标定结果
+ ![标定结果计算形式](picture/标定结果计算形式.png)
 
 ​        得出**相机坐标系**相对于**机械臂末端**坐标系的**旋转矩阵**和**平移向量**
 
@@ -563,13 +493,10 @@ config.yaml里的配置参数如下，有下面三个
 即执行下面脚本时：
 
 ```cmd
-python compute_in_hand.py
+python newcompute_in_hand.py
 ```
 
-或
 
-```python
-python compute_to_hand.py
 ```
 
 可能出现下面问题
